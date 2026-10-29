@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수달 vs 족제비</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Press+Start+2P&display=swap">
+<style>
+  :root { --fg: #0a0a0a; --bg: #fcfcfc; --muted: #f2f2f2; --pixel: "Press Start 2P", monospace; }
+  * { box-sizing: border-box; border-radius: 0; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: "JetBrains Mono", "Courier New", monospace; min-height: 100vh; display: flex; justify-content: center; }
+  main { width: 100%; max-width: 480px; padding: 48px 16px; }
+  .card { border: 2px solid var(--fg); box-shadow: 6px 6px var(--fg); background: #fff; padding: 24px; }
+  h1 { font-family: var(--pixel); font-size: 20px; line-height: 1.5; margin: 0 0 12px; }
+  p { margin: 0 0 24px; font-size: 13px; }
+  #drop { border: 2px dashed var(--fg); min-height: 260px; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--muted); font-size: 13px; text-align: center; padding: 12px; }
+  #drop:hover, #drop:focus-within { background: var(--fg); color: var(--bg); }
+  #img { max-width: 100%; max-height: 340px; display: none; border: 2px solid var(--fg); }
+  #result { margin-top: 24px; }
+  #top { font-family: var(--pixel); font-size: 18px; line-height: 1.5; text-align: center; border: 2px solid var(--fg); background: var(--fg); color: var(--bg); padding: 16px; margin-bottom: 20px; box-shadow: 4px 4px #888; }
+  .row { margin-bottom: 14px; font-size: 13px; }
+  .label { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .bar { height: 16px; border: 2px solid var(--fg); background: #fff; }
+  .bar i { display: block; height: 100%; background: var(--fg); }
+  input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+</style>
+</head>
+<body>
+<main><div class="card">
+  <h1>수달 vs 족제비</h1>
+  <p>사진을 올리면 AI가 구분해 줘요.</p>
+  <label id="drop">
+    <span id="hint">클릭하거나 사진을 끌어다 놓기</span>
+    <img id="img" alt="">
+    <input id="file" type="file" accept="image/*">
+  </label>
+  <div id="result"></div>
+</div></main>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
+<script>
+const URL_BASE = "https://teachablemachine.withgoogle.com/models/kctwtp2Dx/";
+const NAMES = { "Class 1": "수달", "Class 2": "족제비" };
+const $ = id => document.getElementById(id);
+const modelReady = tmImage.load(URL_BASE + "model.json", URL_BASE + "metadata.json");
+
+async function show(file) {
+  if (!file || !file.type.startsWith("image/")) return;
+  const img = $("img");
+  img.src = URL.createObjectURL(file);
+  img.style.display = "block";
+  $("hint").style.display = "none";
+  $("result").textContent = "분석 중...";
+  try {
+    const model = await modelReady;
+    await img.decode();
+    const preds = (await model.predict(img)).sort((a, b) => b.probability - a.probability);
+    $("result").innerHTML = `<div id="top"></div>` + preds.map(p => {
+      const pct = (p.probability * 100).toFixed(1);
+      return `<div class="row"><div class="label"><span></span><b>${pct}%</b></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+    }).join("");
+    $("top").textContent = NAMES[preds[0].className] || preds[0].className;
+    $("result").querySelectorAll(".label span").forEach((s, i) => s.textContent = NAMES[preds[i].className] || preds[i].className);
+  } catch (e) {
+    $("result").textContent = "오류: 모델을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.";
+  }
+}
+
+$("file").onchange = e => show(e.target.files[0]);
+$("drop").ondragover = e => e.preventDefault();
+$("drop").ondrop = e => { e.preventDefault(); show(e.dataTransfer.files[0]); };
+</script>
+</body>
+</html>
